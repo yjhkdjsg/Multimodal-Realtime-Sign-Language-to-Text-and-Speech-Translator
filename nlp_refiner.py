@@ -106,8 +106,6 @@ def refine_asl_buffer(buffer_input):
         'connection_status': connection_msg
     }
 
-
-# Test
 if __name__ == "__main__":
     buffer = ['i','f','e','e','e','l','s','a','d','d']
     result = refine_asl_buffer(buffer)
