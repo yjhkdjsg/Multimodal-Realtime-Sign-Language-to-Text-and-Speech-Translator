@@ -24,10 +24,7 @@ class PiperTTSManager:
         self.model_path = model_path
         
         try:
-            # Initialize Piper Voice
             self.voice = PiperVoice.load(model_path, config_path)
-            
-            # Initialize Pygame Mixer 
             pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=2048)
             print(f"[PiperTTS] Loaded model: {model_path}")
             self.audio_available = True
@@ -43,10 +40,8 @@ class PiperTTSManager:
         if not self.audio_available:
             return
 
-        # Get settings or default to neutral
         settings = self.EMOTION_TTS_PARAMS.get(emotion.lower(), self.EMOTION_TTS_PARAMS['neutral'])
-        
-        # Add to queue
+
         self.queue.put((text, settings))
         
         if not self.is_running:
@@ -58,43 +53,34 @@ class PiperTTSManager:
         while True:
             try:
                 text, settings = self.queue.get(timeout=1)
-                
-                # Generate Audio to Temp File
+
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tf:
                     temp_path = tf.name
                 
-                # Create synthesis config with emotion parameters
                 syn_config = SynthesisConfig(
                     length_scale=settings['speed'],
                     noise_scale=settings['noise']
                 )
                 
-                # Generate audio chunks
                 audio_chunks = list(self.voice.synthesize(text, syn_config))
                 
-                # Write audio chunks to WAV file
                 with wave.open(temp_path, "wb") as wav_file:
                     if audio_chunks:
-                        # Configure wave file parameters from first chunk
                         first_chunk = audio_chunks[0]
                         wav_file.setnchannels(getattr(first_chunk, 'sample_channels', 1))
                         wav_file.setsampwidth(getattr(first_chunk, 'sample_width', 2))
                         wav_file.setframerate(getattr(first_chunk, 'sample_rate', 22050))
                         
-                        # Write all audio data
                         for chunk in audio_chunks:
                             wav_file.writeframes(chunk.audio_int16_bytes)
                 
-                # Play Audio
                 pygame.mixer.music.load(temp_path)
                 pygame.mixer.music.play()
                 
-                # Wait for playback
                 while pygame.mixer.music.get_busy():
                     pygame.time.wait(50)
                 
-                # Cleanup
-                pygame.mixer.music.unload() # Important to release file lock
+                pygame.mixer.music.unload()
                 try:
                     os.unlink(temp_path)
                 except:
@@ -111,43 +97,36 @@ class PiperTTSManager:
     def stop(self):
         try:
             pygame.mixer.music.stop()
-            # Clear queue to stop pending sentences
             with self.queue.mutex:
                 self.queue.queue.clear()
         except:
             pass
 
-    # Sync method for download button (Streamlit safe)
     def generate_audio_bytes(self, text: str, emotion: str, speed_multiplier: float = 1.0) -> bytes:
         """Generates audio bytes immediately for download buttons"""
         settings = self.EMOTION_TTS_PARAMS.get(emotion.lower(), self.EMOTION_TTS_PARAMS['neutral'])
         
-        # Apply speed multiplier to emotion-based speed
         adjusted_speed = settings['speed'] * speed_multiplier
         
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tf:
             temp_path = tf.name
 
         try:
-            # Create synthesis config with emotion parameters
             syn_config = SynthesisConfig(
                 length_scale=adjusted_speed,
                 noise_scale=settings['noise']
             )
             
-            # Generate audio chunks
             audio_chunks = list(self.voice.synthesize(text, syn_config))
             
-            # Write audio chunks to WAV file
             with wave.open(temp_path, "wb") as wav_file:
                 if audio_chunks:
-                    # Configure wave file parameters from first chunk
+                    first_chunk = audio_chunks[0]
                     first_chunk = audio_chunks[0]
                     wav_file.setnchannels(getattr(first_chunk, 'sample_channels', 1))
                     wav_file.setsampwidth(getattr(first_chunk, 'sample_width', 2))
                     wav_file.setframerate(getattr(first_chunk, 'sample_rate', 22050))
                     
-                    # Write all audio data
                     for chunk in audio_chunks:
                         wav_file.writeframes(chunk.audio_int16_bytes)
             
